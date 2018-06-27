@@ -6,10 +6,8 @@ Various procedures used in the drawing
 class GFF_feature():
     """
     A GFF feature data class.
-    It's a bit stripped down (eg ignores reading frame and source), because
-    these attributes are irrelevant for my analysis. On the other hand, ID and
-    parent are class attributes, not stuffed into some dict for the crap from
-    the last field.
+    It's only designed to work with a particular dialect of GFF and is by no
+    means a general purpose GFF parser.
     """
     def __init__(self, **kwargs):
         self.id = kwargs['feat_id']
@@ -31,6 +29,11 @@ class GFF_feature():
 
 
 def parse_gff_line(line):
+    """
+    Create the GFF_feature object from a GFF line
+    :param line:
+    :return:
+    """
     l = line.rstrip().split('\t')
     key_values = l[8].split(';')
     kv_dict = {}
@@ -42,5 +45,6 @@ def parse_gff_line(line):
                        start=int(l[3]),
                        end=int(l[4]),
                        strand=l[6],
-                       parent=kv_dict['Parent'],
+                       parent='Parent' in kv_dict and kv_dict['Parent'] or None,
                        source=l[0])
+
