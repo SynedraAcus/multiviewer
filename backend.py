@@ -62,3 +62,4 @@ def protein_coord_to_gene_coord(features, coord_set):
     # Todo: Should I split regions when in intron?
     #TODO: consider starting from the first codon position and ending with last
     # It will require rewriting the test
+    # Parse reading frames?
