@@ -4,6 +4,9 @@ from argparse import ArgumentParser
 from backend import parse_gff_line
 from sys import stderr
 
+from blast_parser import parse_blast_file_to_hits
+from multiplicates import is_duplicate
+
 parser = ArgumentParser()
 parser.add_argument('-i', type=str, help='Gene ID list')
 # Assumes that all genes in ID list are present here. Other elements, if any, are
@@ -17,7 +20,7 @@ parser.add_argument('-f', type=str, help="""
             """)
 parser.add_argument('--flank-size', type=int, default=1000,
                     help='Width of the flanking region to be extracted from FASTA')
-parser.add_argument('-b', type=str, help='BLAST file')
+parser.add_argument('-b', type=str, help='BLAST TSV file. Assumed to be protein')
 args = parser.parse_args()
 
 # Read the ID list
@@ -78,3 +81,9 @@ if args.f:
               'read mapping if data for them is available.',
               file=stderr)
 
+# Process the BLAST hit file
+multiples_iterator = filter(is_duplicate, parse_blast_file_to_hits(args.b))
+coordinate_sets = {x: [] for x in gene_ids}
+for hit in multiples_iterator:
+    coords = [hsp.query_pos for hsp in hit.hsps]
+    coordinate_sets[hit.query_id.split('|')[2]].append(coords)
