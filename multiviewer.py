@@ -44,6 +44,7 @@ for gene_id in features:
                 features_by_source[feature.source].append(feature)
             else:
                 features_by_source[feature.source] = [feature]
+
 # Extract the gene sequences, if args.f is set
 if args.f:
     # Run without Biopython, if FASTA is not supplied
@@ -59,3 +60,4 @@ if args.f:
                     segment.id = feature.get_id_prefix()
                     segment.description = ''
                     SeqIO.write(segment, gene_fasta, 'fasta')
+
