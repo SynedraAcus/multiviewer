@@ -48,3 +48,17 @@ def parse_gff_line(line):
                        parent='Parent' in kv_dict and kv_dict['Parent'] or None,
                        source=l[0])
 
+
+def protein_coord_to_gene_coord(features, coord_set):
+    """
+    Take a set of gene features and a set of coordinates (in aminoacids),
+    return these coordinates in nucleotides.
+
+    Considers only 'exon' features for intron processing
+    :param features:
+    :param coord_set:
+    :return:
+    """
+    # Todo: Should I split regions when in intron?
+    #TODO: consider starting from the first codon position and ending with last
+    # It will require rewriting the test
