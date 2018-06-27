@@ -17,13 +17,14 @@ parser.add_argument('-f', type=str, help="""
             """)
 parser.add_argument('--flank-size', type=int, default=1000,
                     help='Width of the flanking region to be extracted from FASTA')
+parser.add_argument('-b', type=str, help='BLAST file')
 args = parser.parse_args()
 
 # Read the ID list
 gene_ids = set()
 for line in open(args.i):
     gene_ids.add(line.rstrip())
-print(f'Loaded {len(gene_ids)} gene IDs\n', file=stderr)
+print(f'Loaded {len(gene_ids)} gene IDs', file=stderr)
 
 # Read the GFF file
 features = {x: [] for x in gene_ids}
@@ -34,7 +35,14 @@ for record in open(args.g):
         features[prefix].append(feat)
         #TODO: check that no gene_ids are skipped here and in FASTA processing
 
-# Indexing the GFFs
+# IDs that are absent from the GFF data are reported and forgotten
+skipped = [x for x in features if features[x] == []]
+if len(skipped) > 0:
+    print(f"No GFF data for the following IDs: {', '.join(skipped)}\n" +
+          'These IDs will be ignored in further analysis.',
+          file=stderr)
+
+# Indexing the GFFs for FASTA traversal, read parsing and such
 features_by_source = {}
 for gene_id in features:
     # Using only 'gene' class features
@@ -49,10 +57,12 @@ for gene_id in features:
 if args.f:
     # Run without Biopython, if FASTA is not supplied
     from Bio import SeqIO
+    processed = set()
     with open(args.f+'.genes', mode='w+') as gene_fasta:
         for record in SeqIO.parse(open(args.f), 'fasta'):
             if record.id in features_by_source:
                 for feature in features_by_source[record.id]:
+                    processed.add(feature.get_id_prefix())
                     segment = record[feature.start-args.flank_size:
                                      feature.end+args.flank_size]
                     if feature.strand == '-':
@@ -60,4 +70,11 @@ if args.f:
                     segment.id = feature.get_id_prefix()
                     segment.description = ''
                     SeqIO.write(segment, gene_fasta, 'fasta')
+    missed = gene_ids.difference(processed)
+    if len(missed) > 0:
+        print(len(processed))
+        print(f"No FASTA sources for the following IDs: {', '.join(missed)}\n" +
+              'These genes are absent from genes FASTA, but may be used for ' +
+              'read mapping if data for them is available.',
+              file=stderr)
 
