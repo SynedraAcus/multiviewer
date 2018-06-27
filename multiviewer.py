@@ -33,7 +33,7 @@ for record in open(args.g):
     prefix = feat.get_id_prefix()
     if prefix in gene_ids:
         features[prefix].append(feat)
-        #TODO: check that no gene_ids are skipped here and in FASTA processing
+        #TODO: check that no gene_ids are skipped in BLAST
 
 # IDs that are absent from the GFF data are reported and forgotten
 skipped = [x for x in features if features[x] == []]
