@@ -16,7 +16,6 @@ class GFF_feature():
                 self.__setattr__(key, kwargs[key])
 
     def __str__(self):
-        # TODO: string export
         pass
 
     def get_id_prefix(self):

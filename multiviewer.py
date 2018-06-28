@@ -36,7 +36,6 @@ for record in open(args.g):
     prefix = feat.get_id_prefix()
     if prefix in gene_ids:
         features[prefix].append(feat)
-        #TODO: check that no gene_ids are skipped in BLAST
 
 # IDs that are absent from the GFF data are reported and forgotten
 skipped = [x for x in features if features[x] == []]
@@ -87,3 +86,18 @@ coordinate_sets = {x: [] for x in gene_ids}
 for hit in multiples_iterator:
     coords = [hsp.query_pos for hsp in hit.hsps]
     coordinate_sets[hit.query_id.split('|')[2]].append(coords)
+    missed = set()
+    for gene in gene_ids:
+        if coordinate_sets[gene] == []:
+            missed.add(gene)
+    if len(missed) > 0:
+        print(len(processed))
+        print(f"No BLAST data for the following IDs: {', '.join(missed)}\n" +
+              'These genes are absent from BLAST file (or have only ' +
+              'non-duplicated hits), but the read mapping will be displayed ' +
+              'them, if available.',
+              file=stderr)
+
+# TODO: load SAM data for PacBio and Illumina reads
+
+
