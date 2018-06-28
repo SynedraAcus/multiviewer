@@ -3,7 +3,8 @@ Pytest-compatible tests for the multiviewer backend
 """
 
 import pytest
-from backend import parse_gff_line, GFF_feature, protein_coord_to_gene_coord
+from backend import parse_gff_line, GFF_feature, protein_coord_to_gene_coord, \
+        convert_single_coord
 
 
 @pytest.fixture()
@@ -55,7 +56,18 @@ def test_gff_parsing(feature_standard):
     assert feat.source == feature_standard.source
 
 
-def test_coordinate_conversions(gene_features):
+def test_single_coord_conversion():
+    exons = [(1000, 3000), (9000, 10000)]
+    # First exon
+    assert convert_single_coord(exons, 50, strand='+') == 1150
+    # Second exon
+    assert convert_single_coord(exons, 950, strand='+') == 9850
+    # Same on minus strand
+    assert convert_single_coord(exons, 50, strand='-') == 9850
+    assert convert_single_coord(exons, 950, strand='-') == 1150
+
+
+def test_coordinate_conversions():
     # On a minus strand
     test_lines = [
         'scaffold00080\tmaker\tgene\t1000\t10000\t.\t-\t.\tID=23-gene;Name=23-gene',
@@ -80,6 +92,6 @@ def test_coordinate_conversions(gene_features):
         'scaffold00080\tmaker\tCDS\t1000\t3000\t.\t+\t0\tID=23:cds;Parent=23',
         'scaffold00080\tmaker\tCDS\t9000\t10000\t.\t+\t2\tID=23:cds;Parent=23']
     gene_features = [parse_gff_line(x) for x in test_lines]
-    assert protein_coord_to_gene_coord(gene_features[(10, 300), (750, 1000)]) \
+    assert protein_coord_to_gene_coord(gene_features, [(10, 300), (750, 1000)]) \
             == [(1030, 1900), (9250, 10000)]
-    assert protein_coord_to_gene_coord(gene_features, [200, 800]) ==
+    assert protein_coord_to_gene_coord(gene_features, [(200, 800)]) == [(1600, 9400)]

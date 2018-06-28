@@ -49,6 +49,33 @@ def parse_gff_line(line):
                        source=l[0])
 
 
+def convert_single_coord(exons, coord, strand='+'):
+    """
+    Convert a single coordinate using simplified exon representation
+    Exons should be sorted by (source) coordinates, whatever their strand
+    :param exons:
+    :param coord:
+    :return:
+    """
+    exon_lengths = [x[1] - x[0] for x in exons]
+    if sum(exon_lengths) % 3 != 0:
+        raise ValueError('Exon lengths sum is not divisible by 3.')
+    # A pretty ugly, but working hack. The n-th
+    if strand == '-':
+        c = sum(exon_lengths)/3 - coord
+    elif strand == '+':
+        c = coord
+    else:
+        raise ValueError("Strand should be either \'+\' or \'-\'")
+    x = 0
+    for index, step in enumerate(exon_lengths):
+        if x + step >= c * 3:
+            print(x, step, exons[index])
+            return exons[index][0] - x + c * 3
+        else:
+            x += step
+
+
 def protein_coord_to_gene_coord(features, coord_set):
     """
     Take a set of gene features and a set of coordinates (in aminoacids),
@@ -60,6 +87,11 @@ def protein_coord_to_gene_coord(features, coord_set):
     :return:
     """
     # Todo: Should I split regions when in intron?
-    #TODO: consider starting from the first codon position and ending with last
-    # It will require rewriting the test
-    # Parse reading frames?
+    exons = []
+    for feature in features:
+        if feature.feature_class == 'exon':
+            exons.append((feature.start, feature.end))
+    # Assuming all exons are on the same strand
+    strand = feature.strand
+    return [tuple((convert_single_coord(exons, x, strand) for x in y))
+            for y in coord_set]
