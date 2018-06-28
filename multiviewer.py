@@ -1,9 +1,10 @@
 #! /usr/bin/env python3.6
 
 from argparse import ArgumentParser
-from backend import parse_gff_line
+import svgwrite
 from sys import stderr
 
+from backend import parse_gff_line, protein_coord_to_gene_coord
 from blast_parser import parse_blast_file_to_hits
 from multiplicates import is_duplicate
 
@@ -86,18 +87,51 @@ coordinate_sets = {x: [] for x in gene_ids}
 for hit in multiples_iterator:
     coords = [hsp.query_pos for hsp in hit.hsps]
     coordinate_sets[hit.query_id.split('|')[2]].append(coords)
-    missed = set()
-    for gene in gene_ids:
-        if coordinate_sets[gene] == []:
-            missed.add(gene)
-    if len(missed) > 0:
-        print(len(processed))
-        print(f"No BLAST data for the following IDs: {', '.join(missed)}\n" +
-              'These genes are absent from BLAST file (or have only ' +
-              'non-duplicated hits), but the read mapping will be displayed ' +
-              'them, if available.',
-              file=stderr)
-
+missed = set()
+for gene in gene_ids:
+    if coordinate_sets[gene] == []:
+        missed.add(gene)
+if len(missed) > 0:
+    print(f"No BLAST data for the following IDs: {', '.join(missed)}\n" +
+          'These genes are absent from BLAST file (or have only ' +
+          'non-duplicated hits), but the read mapping will be displayed ' +
+          'for them, if available.',
+          file=stderr)
+nucleotide_coordinates = {x: [] for x in gene_ids if x not in missed}
+for gene_id in nucleotide_coordinates:
+    for hit in coordinate_sets[gene_id]:
+        nucleotide_coordinates[gene_id].append(
+            protein_coord_to_gene_coord(features[gene_id], hit))
+# Todo: convert all data to gene coordinates right after import
 # TODO: load SAM data for PacBio and Illumina reads
 
-
+# Draw BLAST hits as separate lines
+# Todo: design and implement proper BLAST elements
+for gene_id in gene_ids:
+    # Setting coordinates
+    length = 0
+    exons = []
+    gene = None
+    for feature in features[gene_id]:
+        if feature.feature_class == 'gene':
+            gene = feature
+        elif feature.feature_class == 'exon':
+            exons.append(feature)
+    height = 50 + len(nucleotide_coordinates[gene_id])*5
+    drawing = svgwrite.Drawing(filename=f'{gene.id}.svg',
+                               size=(f'{gene.end-gene.start+200}px',
+                                     f'{height}px'))
+    for exon in exons:
+        drawing.add(drawing.rect(insert=(exon.start - gene.start + 100, 20),
+                                 size=(exon.end-exon.start, 20)))
+    running_height = 50
+    for hit in nucleotide_coordinates[gene_id]:
+        for hsp in hit:
+            print(hsp)
+            drawing.add(drawing.line(start=(hsp[0] - gene.start + 100, running_height),
+                                     end=(hsp[1] - gene.start + 100, running_height),
+                                     stroke=svgwrite.rgb(60, 0, 0)))
+        running_height += 5
+    drawing.save()
+    #Todo: output directory
+    quit()

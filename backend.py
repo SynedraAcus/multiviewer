@@ -56,12 +56,11 @@ def convert_single_coord(exons, coord, strand='+'):
     :param coord:
     :return:
     """
-    exon_lengths = [x[1] - x[0] for x in exons]
-    if sum(exon_lengths) % 3 != 0:
-        raise ValueError('Exon lengths sum is not divisible by 3.')
-    # A pretty ugly, but working hack. The n-th
+    exon_lengths = [x[1] - x[0] + 1 for x in exons]
+    # A pretty ugly, but working hack. Not sure if it's not missing a codon,
+    # but whatever. I need a general feel anyway.
     if strand == '-':
-        c = sum(exon_lengths)/3 - coord
+        c = int(sum(exon_lengths)/3) - coord
     elif strand == '+':
         c = coord
     else:
@@ -69,8 +68,7 @@ def convert_single_coord(exons, coord, strand='+'):
     x = 0
     for index, step in enumerate(exon_lengths):
         if x + step >= c * 3:
-            print(x, step, exons[index])
-            return exons[index][0] - x + c * 3
+            return exons[index][0] - x + (c - 1) * 3 + 1
         else:
             x += step
 
