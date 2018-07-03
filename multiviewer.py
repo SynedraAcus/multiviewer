@@ -107,6 +107,9 @@ for gene_id in nucleotide_coordinates:
 
 # Draw BLAST hits as separate lines
 # Todo: design and implement proper BLAST elements
+# It can be handy to somehow average the approx.similar hits, but it will
+# require some math: for starters, we need to cluster them using the overlap
+# (in aminoacid coordinates).
 for gene_id in gene_ids:
     # Setting coordinates
     length = 0
@@ -117,21 +120,23 @@ for gene_id in gene_ids:
             gene = feature
         elif feature.feature_class == 'exon':
             exons.append(feature)
-    height = 50 + len(nucleotide_coordinates[gene_id])*5
+    height = 50 + len(nucleotide_coordinates[gene_id]) * 3
     drawing = svgwrite.Drawing(filename=f'{gene.id}.svg',
                                size=(f'{gene.end-gene.start+200}px',
                                      f'{height}px'))
+    drawing.add(drawing.rect(insert=(0, 0), size=(gene.end - gene.start + 200,
+                                                  height),
+                             fill=svgwrite.rgb(0xff, 0xff, 0xff)))
     for exon in exons:
         drawing.add(drawing.rect(insert=(exon.start - gene.start + 100, 20),
                                  size=(exon.end-exon.start, 20)))
     running_height = 50
     for hit in nucleotide_coordinates[gene_id]:
         for hsp in hit:
-            print(hsp)
             drawing.add(drawing.line(start=(hsp[0] - gene.start + 100, running_height),
                                      end=(hsp[1] - gene.start + 100, running_height),
                                      stroke=svgwrite.rgb(60, 0, 0)))
-        running_height += 5
+        running_height += 3
     drawing.save()
     #Todo: output directory
     quit()
