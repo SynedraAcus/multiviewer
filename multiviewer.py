@@ -129,12 +129,14 @@ for gene_id in nucleotide_blast:
 print('Loading PacBio hits...', file=stderr)
 pb_reader = Reader(open(args.p))
 mapped_hits = {x: [] for x in regions_of_interest}
+read_counts = {x: 0 for x in gene_ids}
 for hit in pb_reader:
-    if hit.rname in regions_of_interest:
+    if hit.rname in features_by_source:
         hit_coord = hit.coords
-        for region in regions_of_interest[hit.rname]:
-            if overlap(region, hit_coord):
+        for gene in features_by_source[hit.rname]:
+            if overlap((gene.start, gene.end), hit_coord):
                 mapped_hits[hit.rname].append(hit_coord)
+                read_counts[gene.get_id_prefix()] += 1
 
 if os.path.isdir(args.d):
     os.chdir(args.d)
@@ -155,8 +157,9 @@ for gene_id in gene_ids:
         elif feature.feature_class == 'exon':
             exons.append(feature)
     # height = 100 + len(nucleotide_blast[gene_id]) * 3
-    # Todo: height and spacing
-    height = 2000
+    height = 100 + 5*len(nucleotide_blast[gene_id]) + \
+             max(nucleotide_blast[gene_id].values()) + \
+             7 * read_counts[gene_id]
     drawing = svgwrite.Drawing(filename=f'{gene.id}.svg',
                                size=(f'{gene.end-gene.start+200}px',
                                      f'{height}px'))
@@ -166,18 +169,18 @@ for gene_id in gene_ids:
     for exon in exons:
         drawing.add(drawing.rect(insert=(exon.start - gene.start + 100, 20),
                                  size=(exon.end-exon.start, 20)))
-    running_height = 50
+    running_height = 60
     # merged BLAST hits
     for domain in nucleotide_blast[gene_id]:
         drawing.add(drawing.rect(insert=(min(domain) - gene.start + 100,
                                          running_height),
                                  size=(abs(domain[1]-domain[0]),
                                        nucleotide_blast[gene_id][domain]),
-                                 stroke=svgwrite.rgb(60, 0, 0),
+                                 stroke=svgwrite.rgb(127, 0, 0),
                                  stroke_width=5,
                                  fill='white',
                                  fill_opacity=0))
-        running_height += 10
+        running_height += 7
     # PacBio reads
     running_height += 20
     for mapped_region in mapped_hits[gene.source]:
@@ -186,7 +189,7 @@ for gene_id in gene_ids:
                                             running_height),
                                      end=(mapped_region[1]-gene.end + 100,
                                           running_height),
-                                     stroke=svgwrite.rgb(0,0,60),
+                                     stroke=svgwrite.rgb(0, 0, 127),
                                      stroke_width=3
                                      ))
             running_height += 5
