@@ -137,15 +137,15 @@ for gene_id in gene_ids:
                                  size=(exon.end-exon.start, 20)))
     running_height = 50
     for domain in nucleotide_blast[gene_id]:
-        drawing.add(drawing.rect(insert=(domain[0] - gene.start + 100,
+        drawing.add(drawing.rect(insert=(min(domain) - gene.start + 100,
                                          running_height),
-                                 size=(domain[1]-domain[0],
+                                 size=(abs(domain[1]-domain[0]),
                                        nucleotide_blast[gene_id][domain]),
                                  stroke=svgwrite.rgb(60, 0, 0),
                                  stroke_width=5,
                                  fill='white',
-                                 fill_opacity = 0))
-        running_height += 5
+                                 fill_opacity=0))
+        running_height += 10
     drawing.save()
     #Todo: output directory
     quit()
