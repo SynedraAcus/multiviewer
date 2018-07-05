@@ -2,6 +2,8 @@
 Various procedures used in the drawing
 """
 
+from multiplicates import overlap, overlap_len
+
 
 class GFF_feature():
     """
@@ -92,3 +94,42 @@ def protein_coord_to_gene_coord(features, coord_set):
     strand = feature.strand
     return [tuple((convert_single_coord(exons, x, strand) for x in y))
             for y in coord_set]
+
+
+def reduce_coords(coord_set, overlap_cutoff=0.8):
+    """
+    Reduce a coordinate set, averaging overlapping coordinates.
+    Coordinates are considered overlapping when at least `overlap_cutoff`
+    of either pair of coordinates is overlapping with the other.
+    :param coord_set: A list of lists of coord tuples
+    :param overlap:
+    :return:
+    """
+    r = list(coord_set[0])
+    # A hit is a collection of HSP coordinate pairs
+    # Non-blast coordinates are treated similarly
+    for hit in coord_set[1:]:
+        for hsp in hit:
+            merged = False
+            for index, coord in enumerate(r):
+                if overlap(coord, hsp):
+                    l = overlap_len(coord, hsp)
+                    hsp_len = hsp[1] - hsp[0]
+                    coord_len = coord[1] - coord[0]
+                    if l >= overlap_cutoff * hsp_len or \
+                            l > overlap_cutoff * coord_len:
+                        # Forget the smaller one if the other is at least twice
+                        # bigger
+                        if hsp_len >= coord_len * 2:
+                            r[index] = hsp
+                        elif coord_len >= hsp_len * 2:
+                            break
+                        # Average position if they are ~equal
+                        else:
+                            r[index] = round((hsp[0] + coord[0]) / 2), \
+                                       round((hsp[1] + coord[1]) / 2)
+                        merged = True
+                        break
+            if not merged:
+                r.append(hsp)
+    return sorted(r, key=lambda x: x[0])

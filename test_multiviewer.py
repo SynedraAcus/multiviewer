@@ -4,7 +4,7 @@ Pytest-compatible tests for the multiviewer backend
 
 import pytest
 from backend import parse_gff_line, GFF_feature, protein_coord_to_gene_coord, \
-        convert_single_coord
+        convert_single_coord, reduce_coords
 
 
 @pytest.fixture()
@@ -96,3 +96,17 @@ def test_coordinate_conversions():
     assert protein_coord_to_gene_coord(gene_features, [(10, 300), (750, 1000)]) \
             == [(1028, 1898), (9247, 9997)]
     assert protein_coord_to_gene_coord(gene_features, [(200, 800)]) == [(1598, 9397)]
+
+
+def test_overlap_simplification():
+    # Correct coord recalculation
+    assert reduce_coords([[(18, 30), (100, 200)], [(20, 30), (110, 210)]]) ==\
+            [(19, 30), (105, 205)]
+    # Skipping the hits that can't be merged
+    assert reduce_coords([[(18, 30), (100, 200), (50, 80)], [(20, 30), (110, 210)]],
+                         overlap_cutoff=0.9) ==\
+           [(19, 30), (50, 80), (105, 205)]
+    # Overlap_cutoff, should not merge the last HSP
+    assert reduce_coords([[(18, 30), (100, 200), (50, 80)], [(20, 30), (110, 210)]],
+                         overlap_cutoff=1) == \
+           [(19, 30), (50, 80), (100, 200), (110, 210)]

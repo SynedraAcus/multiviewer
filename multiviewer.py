@@ -102,7 +102,6 @@ for gene_id in nucleotide_coordinates:
     for hit in coordinate_sets[gene_id]:
         nucleotide_coordinates[gene_id].append(
             protein_coord_to_gene_coord(features[gene_id], hit))
-# Todo: convert all data to gene coordinates right after import
 # TODO: load SAM data for PacBio and Illumina reads
 
 # Draw BLAST hits as separate lines
