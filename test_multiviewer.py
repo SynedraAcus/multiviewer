@@ -4,8 +4,8 @@ Pytest-compatible tests for the multiviewer backend
 
 import pytest
 from backend import parse_gff_line, GFF_feature, protein_coord_to_gene_coord, \
-        convert_single_coord, reduce_coords
-
+        convert_single_coord, convert_coord_dict, reduce_coords
+from collections import OrderedDict
 
 @pytest.fixture()
 def feature_standard():
@@ -96,6 +96,42 @@ def test_coordinate_conversions():
     assert protein_coord_to_gene_coord(gene_features, [(10, 300), (750, 1000)]) \
             == [(1028, 1898), (9247, 9997)]
     assert protein_coord_to_gene_coord(gene_features, [(200, 800)]) == [(1598, 9397)]
+
+
+def test_dict_conversion():
+    # Tests convert_coord_dict. Same data as above
+    # On a minus strand
+    test_lines = [
+        'scaffold00080\tmaker\tgene\t1000\t10000\t.\t-\t.\tID=23-gene;Name=23-gene',
+        'scaffold00080\tmaker\tmRNA\t1000\t10000\t.\t-\t.\tID=23;Parent=23-gene;Name=23;_AED=0.12;_eAED=0.13;_QI=0|0|0|1|1|1|2|0|481;Note=protein;Ontology_term=GO:0016706,GO:0005506,GO:0055114,GO:0031418;EC=EC:1.14.11',
+        'scaffold00080\tmaker\texon\t1000\t3000\t.\t-\t.\tID=23:exon:58;Parent=23',
+        'scaffold00080\tmaker\texon\t9000\t10000\t.\t-\t.\tID=23:exon:57;Parent=23',
+        'scaffold00080\tmaker\tCDS\t1000\t3000\t.\t-\t0\tID=23:cds;Parent=23',
+        'scaffold00080\tmaker\tCDS\t9000\t10000\t.\t-\t2\tID=23:cds;Parent=23']
+    gene_features = [parse_gff_line(x) for x in test_lines]
+    # No domains overlapping intron but multiple domains
+    assert convert_coord_dict(gene_features,
+                                       OrderedDict([((10, 300), 1),
+                                                    ((350, 800), 2)])) == \
+           OrderedDict([((9967, 9097), 1), ((2948, 1598), 2)])
+    # Intron-overlapping domain
+    assert convert_coord_dict(gene_features,
+                                       OrderedDict([((10, 500), 5)])) ==\
+           OrderedDict([((9967, 2498), 5)])
+    test_lines = [
+        'scaffold00080\tmaker\tgene\t1000\t10000\t.\t+\t.\tID=23-gene;Name=23-gene',
+        'scaffold00080\tmaker\tmRNA\t1000\t10000\t.\t+\t.\tID=23;Parent=23-gene;Name=23;_AED=0.12;_eAED=0.13;_QI=0|0|0|1|1|1|2|0|481;Note=protein;Ontology_term=GO:0016706,GO:0005506,GO:0055114,GO:0031418;EC=EC:1.14.11',
+        'scaffold00080\tmaker\texon\t1000\t3000\t.\t+\t.\tID=23:exon:58;Parent=23',
+        'scaffold00080\tmaker\texon\t9000\t10000\t.\t+\t.\tID=23:exon:57;Parent=23',
+        'scaffold00080\tmaker\tCDS\t1000\t3000\t.\t+\t0\tID=23:cds;Parent=23',
+        'scaffold00080\tmaker\tCDS\t9000\t10000\t.\t+\t2\tID=23:cds;Parent=23']
+    gene_features = [parse_gff_line(x) for x in test_lines]
+    assert convert_coord_dict(gene_features,
+                               OrderedDict([((10, 300), 1), ((750, 1000), 2)]))\
+           == OrderedDict([((1028, 1898), 1), ((9247, 9997), 2)])
+    assert convert_coord_dict(gene_features,
+                                       OrderedDict([((200, 800), 2)])) == \
+                               OrderedDict([((1598, 9397), 2)])
 
 
 def test_overlap_simplification():

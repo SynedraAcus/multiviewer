@@ -96,6 +96,28 @@ def protein_coord_to_gene_coord(features, coord_set):
             for y in coord_set]
 
 
+def convert_coord_dict(features, coords):
+    """
+    Same as `protein_coord_to_gene_coord` except that it takes an OrderedDict
+    whose keys are coordinate pair and returns the OrderedDict where coordinates
+    are converted and keys are preserved
+    :param features:
+    :param coords:
+    :return:
+    """
+    r = OrderedDict()
+    exons = []
+    for feature in features:
+        if feature.feature_class == 'exon':
+            exons.append((feature.start, feature.end))
+    strand = feature.strand
+    for coord_pair in coords:
+        r[(convert_single_coord(exons, coord_pair[0], strand),
+           convert_single_coord(exons, coord_pair[1], strand))] =\
+                    coords[coord_pair]
+    return r
+
+
 def reduce_coord_list(coord_set, initial_counts, overlap_cutoff):
     """
     Reduce a coordinate set, averaging overlapping coordinates.

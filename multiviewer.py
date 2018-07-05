@@ -4,7 +4,8 @@ from argparse import ArgumentParser
 import svgwrite
 from sys import stderr
 
-from backend import parse_gff_line, protein_coord_to_gene_coord, reduce_coords
+from backend import parse_gff_line, protein_coord_to_gene_coord, reduce_coords,\
+        convert_coord_dict
 from blast_parser import parse_blast_file_to_hits
 from multiplicates import is_duplicate
 
@@ -101,11 +102,13 @@ if len(missed) > 0:
           'non-duplicated hits), but the read mapping will be displayed ' +
           'for them, if available.',
           file=stderr)
-nucleotide_coordinates = {x: [] for x in gene_ids if x not in missed}
-for gene_id in nucleotide_coordinates:
-    for hit in coordinate_sets[gene_id]:
-        nucleotide_coordinates[gene_id].append(
-            protein_coord_to_gene_coord(features[gene_id], hit))
+# Converting hits to nucleotide coordinates
+nucleotide_blast = {x: [] for x in gene_ids if x not in missed}
+for gene_id in nucleotide_blast:
+    nucleotide_blast[gene_id] =\
+            convert_coord_dict(features[gene_id],
+                               coordinate_sets[gene_id])
+
 # TODO: load SAM data for PacBio and Illumina reads
 
 # Draw BLAST hits as separate lines
@@ -120,7 +123,9 @@ for gene_id in gene_ids:
             gene = feature
         elif feature.feature_class == 'exon':
             exons.append(feature)
-    height = 50 + len(nucleotide_coordinates[gene_id]) * 3
+    # height = 100 + len(nucleotide_blast[gene_id]) * 3
+    # Todo: height
+    height = 2000
     drawing = svgwrite.Drawing(filename=f'{gene.id}.svg',
                                size=(f'{gene.end-gene.start+200}px',
                                      f'{height}px'))
@@ -131,12 +136,16 @@ for gene_id in gene_ids:
         drawing.add(drawing.rect(insert=(exon.start - gene.start + 100, 20),
                                  size=(exon.end-exon.start, 20)))
     running_height = 50
-    for hit in nucleotide_coordinates[gene_id]:
-        for hsp in hit:
-            drawing.add(drawing.line(start=(hsp[0] - gene.start + 100, running_height),
-                                     end=(hsp[1] - gene.start + 100, running_height),
-                                     stroke=svgwrite.rgb(60, 0, 0)))
-        running_height += 3
+    for domain in nucleotide_blast[gene_id]:
+        drawing.add(drawing.rect(insert=(domain[0] - gene.start + 100,
+                                         running_height),
+                                 size=(domain[1]-domain[0],
+                                       nucleotide_blast[gene_id][domain]),
+                                 stroke=svgwrite.rgb(60, 0, 0),
+                                 stroke_width=5,
+                                 fill='white',
+                                 fill_opacity = 0))
+        running_height += 5
     drawing.save()
     #Todo: output directory
     quit()
