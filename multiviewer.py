@@ -87,18 +87,14 @@ coordinate_sets = {x: [] for x in gene_ids}
 for hit in multiples_iterator:
     coords = [hsp.query_pos for hsp in hit.hsps]
     coordinate_sets[hit.query_id.split('|')[2]].append(coords)
+
 # Averaging BLAST hits and calculating the missing genes set
 missed = set()
 for gene_id in gene_ids:
-    print(f'old for {gene_id}')
-    print(coordinate_sets[gene_id])
     if coordinate_sets[gene_id] == []:
         missed.add(gene_id)
     else:
         coordinate_sets[gene_id] = reduce_coords(coordinate_sets[gene_id])
-    print('new')
-    print(coordinate_sets[gene_id])
-quit()
 if len(missed) > 0:
     print(f"No BLAST data for the following IDs: {', '.join(missed)}\n" +
           'These genes are absent from BLAST file (or have only ' +

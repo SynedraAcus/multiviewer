@@ -3,7 +3,7 @@ Various procedures used in the drawing
 """
 
 from multiplicates import overlap, overlap_len
-
+from collections import OrderedDict
 
 class GFF_feature():
     """
@@ -96,43 +96,89 @@ def protein_coord_to_gene_coord(features, coord_set):
             for y in coord_set]
 
 
-def reduce_coords(coord_set, overlap_cutoff=0.8):
+def reduce_coord_list(coord_set, initial_counts, overlap_cutoff):
     """
     Reduce a coordinate set, averaging overlapping coordinates.
     Coordinates are considered overlapping when at least `overlap_cutoff`
     of either pair of coordinates is overlapping with the other.
-    :param coord_set: A list of lists of coord tuples
-    :param overlap:
+    :param coord_set:
+    :param counts:
+    :param overlap_cutoff:
     :return:
     """
-    r = list(coord_set[0])
-    counts = [1 for _ in r]
-    # A hit is a collection of HSP coordinate pairs
-    # Non-blast coordinates are treated similarly
-    for hit in coord_set[1:]:
-        for hsp in hit:
-            merged = False
-            for index, coord in enumerate(r):
-                if overlap(coord, hsp):
-                    l = overlap_len(coord, hsp)
-                    hsp_len = hsp[1] - hsp[0]
-                    coord_len = coord[1] - coord[0]
-                    if l >= overlap_cutoff * hsp_len or \
-                            l > overlap_cutoff * coord_len:
-                        # Forget the smaller one if the other is at least twice
-                        # bigger
-                        if hsp_len >= coord_len * 2:
-                            r[index] = hsp
-                        elif coord_len >= hsp_len * 2:
-                            break
-                        # Average position if they are ~equal
-                        else:
-                            r[index] = round((hsp[0] + coord[0]) / 2), \
-                                       round((hsp[1] + coord[1]) / 2)
-                        counts[index] += 1
-                        merged = True
+    assert len(coord_set) == len(initial_counts)
+    r = [coord_set[0]]
+    counts = [initial_counts[0]]
+    for hsp_index, hsp in enumerate(coord_set[1:]):
+        merged = False
+        for index, coord in enumerate(r):
+            if overlap(coord, hsp):
+                l = overlap_len(coord, hsp)
+                hsp_len = hsp[1] - hsp[0]
+                coord_len = coord[1] - coord[0]
+                if l >= overlap_cutoff * hsp_len or \
+                        l > overlap_cutoff * coord_len:
+                    # Forget the smaller one if the other is at least twice
+                    # bigger
+                    if hsp_len >= coord_len * 2:
+                        r[index] = hsp
+                    elif coord_len >= hsp_len * 2:
                         break
-            if not merged:
-                r.append(hsp)
-                counts.append(1)
-    return {r[x]: counts[x] for x in range(len(r))}
+                    # Average position if they are ~equal
+                    else:
+                        r[index] = round((hsp[0] + coord[0]) / 2), \
+                                   round((hsp[1] + coord[1]) / 2)
+                    counts[index] += initial_counts[hsp_index + 1]
+                    merged = True
+                    break
+        if not merged:
+            r.append(hsp)
+            counts.append(initial_counts[hsp_index + 1])
+    return OrderedDict((r[x], counts[x]) for x in range(len(r)))
+
+
+def reduce_coords(coord_set, overlap_cutoff=0.8):
+    """
+    Wrapper around reduce_coord_list that converts BLAST hit data and runs
+    a second reduction round
+    :param coord_set: A list of lists of coord tuples
+    :param overlap_cutoff:
+    :return:
+    """
+    coords = [hsp for hit in coord_set for hsp in hit]
+    c = [1 for x in coords]
+    r = reduce_coord_list(coords, c, overlap_cutoff)
+    # A se
+    return reduce_coord_list(tuple(r.keys()), tuple(r.values()), overlap_cutoff)
+
+    # r = list(coord_set[0])
+    # counts = [1 for _ in r]
+    # # A hit is a collection of HSP coordinate pairs
+    # # Non-blast coordinates are treated similarly
+    # for hit in coord_set[1:]:
+    #     for hsp in hit:
+    #         merged = False
+    #         for index, coord in enumerate(r):
+    #             if overlap(coord, hsp):
+    #                 l = overlap_len(coord, hsp)
+    #                 hsp_len = hsp[1] - hsp[0]
+    #                 coord_len = coord[1] - coord[0]
+    #                 if l >= overlap_cutoff * hsp_len or \
+    #                         l > overlap_cutoff * coord_len:
+    #                     # Forget the smaller one if the other is at least twice
+    #                     # bigger
+    #                     if hsp_len >= coord_len * 2:
+    #                         r[index] = hsp
+    #                     elif coord_len >= hsp_len * 2:
+    #                         break
+    #                     # Average position if they are ~equal
+    #                     else:
+    #                         r[index] = round((hsp[0] + coord[0]) / 2), \
+    #                                    round((hsp[1] + coord[1]) / 2)
+    #                     counts[index] += 1
+    #                     merged = True
+    #                     break
+    #         if not merged:
+    #             r.append(hsp)
+    #             counts.append(1)
+    # return {r[x]: counts[x] for x in range(len(r))}
