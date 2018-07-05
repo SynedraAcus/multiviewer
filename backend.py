@@ -85,7 +85,6 @@ def protein_coord_to_gene_coord(features, coord_set):
     :param coord_set:
     :return:
     """
-    # Todo: Should I split regions when in intron?
     exons = []
     for feature in features:
         if feature.feature_class == 'exon':

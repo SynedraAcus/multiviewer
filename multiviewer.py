@@ -4,9 +4,9 @@ from argparse import ArgumentParser
 import svgwrite
 from sys import stderr
 from simplesam import Reader
+import os
 
-from backend import parse_gff_line, protein_coord_to_gene_coord, reduce_coords,\
-        convert_coord_dict
+from backend import parse_gff_line, reduce_coords, convert_coord_dict
 from blast_parser import parse_blast_file_to_hits
 from multiplicates import is_duplicate, overlap
 
@@ -25,6 +25,10 @@ parser.add_argument('--flank-size', type=int, default=1000,
                     help='Width of the flanking region to be extracted from FASTA')
 parser.add_argument('-b', type=str, help='BLAST TSV file. Assumed to be protein')
 parser.add_argument('-p', type=str, help='PacBio SAM file')
+parser.add_argument('-d', type=str, default='schemes', help="""
+        Output directory. This directory will be created, if it doesn't exist.
+        Default: 'schemes'
+        """)
 args = parser.parse_args()
 
 # Read the ID list
@@ -132,6 +136,14 @@ for hit in pb_reader:
             if overlap(region, hit_coord):
                 mapped_hits[hit.rname].append(hit_coord)
 
+if os.path.isdir(args.d):
+    os.chdir(args.d)
+else:
+    os.mkdir(args.d)
+    os.chdir(args.d)
+    print(f'The directory {args.d} did not exist and was created',
+          file=stderr)
+    
 for gene_id in gene_ids:
     # Setting coordinates
     length = 0
@@ -143,7 +155,7 @@ for gene_id in gene_ids:
         elif feature.feature_class == 'exon':
             exons.append(feature)
     # height = 100 + len(nucleotide_blast[gene_id]) * 3
-    # Todo: height
+    # Todo: height and spacing
     height = 2000
     drawing = svgwrite.Drawing(filename=f'{gene.id}.svg',
                                size=(f'{gene.end-gene.start+200}px',
@@ -179,5 +191,5 @@ for gene_id in gene_ids:
                                      ))
             running_height += 5
     drawing.save()
-    #Todo: output directory
+    # Runs a single image because it's in dev
     quit()
