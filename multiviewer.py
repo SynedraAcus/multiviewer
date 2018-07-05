@@ -3,11 +3,12 @@
 from argparse import ArgumentParser
 import svgwrite
 from sys import stderr
+from simplesam import Reader
 
 from backend import parse_gff_line, protein_coord_to_gene_coord, reduce_coords,\
         convert_coord_dict
 from blast_parser import parse_blast_file_to_hits
-from multiplicates import is_duplicate
+from multiplicates import is_duplicate, overlap
 
 parser = ArgumentParser()
 parser.add_argument('-i', type=str, help='Gene ID list')
@@ -23,6 +24,7 @@ parser.add_argument('-f', type=str, help="""
 parser.add_argument('--flank-size', type=int, default=1000,
                     help='Width of the flanking region to be extracted from FASTA')
 parser.add_argument('-b', type=str, help='BLAST TSV file. Assumed to be protein')
+parser.add_argument('-p', type=str, help='PacBio SAM file')
 args = parser.parse_args()
 
 # Read the ID list
@@ -48,17 +50,24 @@ if len(skipped) > 0:
 
 # Indexing the GFFs for FASTA traversal, read parsing and such
 features_by_source = {}
+regions_of_interest = {}
 for gene_id in features:
     # Using only 'gene' class features
     for feature in features[gene_id]:
         if feature.feature_class == 'gene':
             if feature.source in features_by_source:
                 features_by_source[feature.source].append(feature)
+                regions_of_interest[feature.source].append((feature.start,
+                                                            feature.end))
             else:
                 features_by_source[feature.source] = [feature]
+                regions_of_interest[feature.source] = [(feature.start,
+                                                        feature.end)]
+
 
 # Extract the gene sequences, if args.f is set
 if args.f:
+    print('Loading sequences...', file=stderr)
     # Run without Biopython, if FASTA is not supplied
     from Bio import SeqIO
     processed = set()
@@ -83,6 +92,7 @@ if args.f:
               file=stderr)
 
 # Process the BLAST hit file
+print('Loading BLAST hits...', file=stderr)
 multiples_iterator = filter(is_duplicate, parse_blast_file_to_hits(args.b))
 coordinate_sets = {x: [] for x in gene_ids}
 for hit in multiples_iterator:
@@ -109,10 +119,19 @@ for gene_id in nucleotide_blast:
             convert_coord_dict(features[gene_id],
                                coordinate_sets[gene_id])
 
-# TODO: load SAM data for PacBio and Illumina reads
+# TODO: load SAM data for Illumina reads
 
-# Draw BLAST hits as separate lines
-# Todo: design and implement proper BLAST elements
+# Loading PacBio reads
+print('Loading PacBio hits...', file=stderr)
+pb_reader = Reader(open(args.p))
+mapped_hits = {x: [] for x in regions_of_interest}
+for hit in pb_reader:
+    if hit.rname in regions_of_interest:
+        hit_coord = hit.coords
+        for region in regions_of_interest[hit.rname]:
+            if overlap(region, hit_coord):
+                mapped_hits[hit.rname].append(hit_coord)
+
 for gene_id in gene_ids:
     # Setting coordinates
     length = 0
@@ -136,6 +155,7 @@ for gene_id in gene_ids:
         drawing.add(drawing.rect(insert=(exon.start - gene.start + 100, 20),
                                  size=(exon.end-exon.start, 20)))
     running_height = 50
+    # merged BLAST hits
     for domain in nucleotide_blast[gene_id]:
         drawing.add(drawing.rect(insert=(min(domain) - gene.start + 100,
                                          running_height),
@@ -146,6 +166,18 @@ for gene_id in gene_ids:
                                  fill='white',
                                  fill_opacity=0))
         running_height += 10
+    # PacBio reads
+    running_height += 20
+    for mapped_region in mapped_hits[gene.source]:
+        if overlap(mapped_region, (gene.start, gene.end)):
+            drawing.add(drawing.line(start=(mapped_region[0]-gene.start + 100,
+                                            running_height),
+                                     end=(mapped_region[1]-gene.end + 100,
+                                          running_height),
+                                     stroke=svgwrite.rgb(0,0,60),
+                                     stroke_width=3
+                                     ))
+            running_height += 5
     drawing.save()
     #Todo: output directory
     quit()
