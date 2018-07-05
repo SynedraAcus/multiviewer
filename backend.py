@@ -106,6 +106,7 @@ def reduce_coords(coord_set, overlap_cutoff=0.8):
     :return:
     """
     r = list(coord_set[0])
+    counts = [1 for _ in r]
     # A hit is a collection of HSP coordinate pairs
     # Non-blast coordinates are treated similarly
     for hit in coord_set[1:]:
@@ -128,8 +129,10 @@ def reduce_coords(coord_set, overlap_cutoff=0.8):
                         else:
                             r[index] = round((hsp[0] + coord[0]) / 2), \
                                        round((hsp[1] + coord[1]) / 2)
+                        counts[index] += 1
                         merged = True
                         break
             if not merged:
                 r.append(hsp)
-    return sorted(r, key=lambda x: x[0])
+                counts.append(1)
+    return {r[x]: counts[x] for x in range(len(r))}

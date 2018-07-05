@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 import svgwrite
 from sys import stderr
 
-from backend import parse_gff_line, protein_coord_to_gene_coord
+from backend import parse_gff_line, protein_coord_to_gene_coord, reduce_coords
 from blast_parser import parse_blast_file_to_hits
 from multiplicates import is_duplicate
 
@@ -87,10 +87,18 @@ coordinate_sets = {x: [] for x in gene_ids}
 for hit in multiples_iterator:
     coords = [hsp.query_pos for hsp in hit.hsps]
     coordinate_sets[hit.query_id.split('|')[2]].append(coords)
+# Averaging BLAST hits and calculating the missing genes set
 missed = set()
-for gene in gene_ids:
-    if coordinate_sets[gene] == []:
-        missed.add(gene)
+for gene_id in gene_ids:
+    print(f'old for {gene_id}')
+    print(coordinate_sets[gene_id])
+    if coordinate_sets[gene_id] == []:
+        missed.add(gene_id)
+    else:
+        coordinate_sets[gene_id] = reduce_coords(coordinate_sets[gene_id])
+    print('new')
+    print(coordinate_sets[gene_id])
+quit()
 if len(missed) > 0:
     print(f"No BLAST data for the following IDs: {', '.join(missed)}\n" +
           'These genes are absent from BLAST file (or have only ' +
@@ -106,9 +114,6 @@ for gene_id in nucleotide_coordinates:
 
 # Draw BLAST hits as separate lines
 # Todo: design and implement proper BLAST elements
-# It can be handy to somehow average the approx.similar hits, but it will
-# require some math: for starters, we need to cluster them using the overlap
-# (in aminoacid coordinates).
 for gene_id in gene_ids:
     # Setting coordinates
     length = 0

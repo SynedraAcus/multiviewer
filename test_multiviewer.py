@@ -101,12 +101,12 @@ def test_coordinate_conversions():
 def test_overlap_simplification():
     # Correct coord recalculation
     assert reduce_coords([[(18, 30), (100, 200)], [(20, 30), (110, 210)]]) ==\
-            [(19, 30), (105, 205)]
+           {(19, 30): 2, (105, 205): 2}
     # Skipping the hits that can't be merged
     assert reduce_coords([[(18, 30), (100, 200), (50, 80)], [(20, 30), (110, 210)]],
                          overlap_cutoff=0.9) ==\
-           [(19, 30), (50, 80), (105, 205)]
+           {(19, 30): 2, (50, 80): 1, (105, 205): 2}
     # Overlap_cutoff, should not merge the last HSP
     assert reduce_coords([[(18, 30), (100, 200), (50, 80)], [(20, 30), (110, 210)]],
                          overlap_cutoff=1) == \
-           [(19, 30), (50, 80), (100, 200), (110, 210)]
+           {(19, 30): 2, (50, 80): 1, (100, 200): 1, (110, 210): 1}
