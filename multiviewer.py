@@ -194,5 +194,3 @@ for gene_id in gene_ids:
                                      ))
             running_height += 5
     drawing.save()
-    # Runs a single image because it's in dev
-    quit()
