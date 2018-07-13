@@ -1,6 +1,7 @@
 #! /usr/bin/env python3.6
 
 from argparse import ArgumentParser
+from copy import deepcopy
 import svgwrite
 from sys import stderr
 from simplesam import Reader
@@ -21,6 +22,8 @@ parser.add_argument('-f', type=str, help="""
             is extracted into a separate FASTA file. If FASTA headers do not
             correspond to those in GFF file, raises an exception. 
             """)
+parser.add_argument('-e', type=str, help='TSV output for mulitplicates',
+                    default='multiplicates.tsv')
 parser.add_argument('--flank-size', type=int, default=1000,
                     help='Width of the flanking region to be extracted from FASTA')
 parser.add_argument('-b', type=str, help='BLAST TSV file. Assumed to be protein')
@@ -69,13 +72,46 @@ for gene_id in features:
                                                         feature.end)]
 
 
-# Extract the gene sequences, if args.f is set
+# Process the BLAST hit file
+print('Loading BLAST hits...', file=stderr)
+multiples_iterator = filter(is_duplicate, parse_blast_file_to_hits(args.b))
+coordinate_sets = {}
+for hit in multiples_iterator:
+    coords = [hsp.query_pos for hsp in hit.hsps]
+    name = hit.query_id.split('|')[2]
+    if name in coordinate_sets:
+        coordinate_sets[name].append(coords)
+    else:
+        coordinate_sets[name] = [coords]
+
+# Averaging BLAST hits and calculating the missing genes set
+blast_missed = set()
+for gene_id in gene_ids:
+    if gene_id not in coordinate_sets or coordinate_sets[gene_id] == []:
+        blast_missed.add(gene_id)
+    else:
+        coordinate_sets[gene_id] = reduce_coords(coordinate_sets[gene_id])
+if len(blast_missed) > 0:
+    print(f"No BLAST data for the following IDs: {', '.join(blast_missed)}\n" +
+          'These genes are absent from BLAST file (or have only ' +
+          'non-duplicated hits), but the read mapping will be displayed ' +
+          'for them, if available.',
+          file=stderr)
+# Converting hits to nucleotide coordinates
+nucleotide_blast = {x: [] for x in gene_ids if x not in blast_missed}
+for gene_id in nucleotide_blast:
+    nucleotide_blast[gene_id] =\
+            convert_coord_dict(features[gene_id],
+                               coordinate_sets[gene_id])
+
+# Extract the gene sequences, if args.f is set, and export data
 if args.f:
     print('Loading sequences...', file=stderr)
     # Run without Biopython, if FASTA is not supplied
     from Bio import SeqIO
     processed = set()
     with open(args.f+'.genes', mode='w+') as gene_fasta:
+        tsv = open(args.e, mode='w')
         for record in SeqIO.parse(open(args.f), 'fasta'):
             if record.id in features_by_source:
                 for feature in features_by_source[record.id]:
@@ -86,7 +122,32 @@ if args.f:
                         segment = segment.reverse_complement()
                     segment.id = feature.get_id_prefix()
                     segment.description = ''
+                    try:
+                        blast_regions = deepcopy(nucleotide_blast[
+                                                     feature.get_id_prefix()])
+                    except KeyError:
+                        continue
+                    top_regions = sorted(sorted(blast_regions.keys(),
+                                         key=lambda x: blast_regions[x])[:2],
+                                         key=lambda x: x[0])
                     SeqIO.write(segment, gene_fasta, 'fasta')
+                    print('\t'.join((str(x) for x in
+                                (feature.get_id_prefix(),
+                                record.id,
+                                # Coordinates relative to extracted seq
+                                top_regions[0][0]+args.flank_size-feature.start,
+                                top_regions[0][1]+args.flank_size-feature.start,
+                                top_regions[1][0]+args.flank_size-feature.start,
+                                top_regions[1][1]+args.flank_size-feature.start,
+                                # Coordinates relative to scaffold
+                                top_regions[0][0] + args.flank_size,
+                                top_regions[0][1] + args.flank_size,
+                                top_regions[1][0] + args.flank_size,
+                                top_regions[1][1] + args.flank_size,
+                                ))),
+                          file=tsv)
+        tsv.flush()
+    # Check for missing genes
     missed = gene_ids.difference(processed)
     if len(missed) > 0:
         print(len(processed))
@@ -94,34 +155,6 @@ if args.f:
               'These genes are absent from genes FASTA, but may be used for ' +
               'read mapping if data for them is available.',
               file=stderr)
-
-# Process the BLAST hit file
-print('Loading BLAST hits...', file=stderr)
-multiples_iterator = filter(is_duplicate, parse_blast_file_to_hits(args.b))
-coordinate_sets = {x: [] for x in gene_ids}
-for hit in multiples_iterator:
-    coords = [hsp.query_pos for hsp in hit.hsps]
-    coordinate_sets[hit.query_id.split('|')[2]].append(coords)
-
-# Averaging BLAST hits and calculating the missing genes set
-missed = set()
-for gene_id in gene_ids:
-    if coordinate_sets[gene_id] == []:
-        missed.add(gene_id)
-    else:
-        coordinate_sets[gene_id] = reduce_coords(coordinate_sets[gene_id])
-if len(missed) > 0:
-    print(f"No BLAST data for the following IDs: {', '.join(missed)}\n" +
-          'These genes are absent from BLAST file (or have only ' +
-          'non-duplicated hits), but the read mapping will be displayed ' +
-          'for them, if available.',
-          file=stderr)
-# Converting hits to nucleotide coordinates
-nucleotide_blast = {x: [] for x in gene_ids if x not in missed}
-for gene_id in nucleotide_blast:
-    nucleotide_blast[gene_id] =\
-            convert_coord_dict(features[gene_id],
-                               coordinate_sets[gene_id])
 
 # TODO: load SAM data for Illumina reads
 
@@ -138,6 +171,8 @@ for hit in pb_reader:
                 mapped_hits[hit.rname].append(hit_coord)
                 read_counts[gene.get_id_prefix()] += 1
 
+
+# Producing images
 if os.path.isdir(args.d):
     os.chdir(args.d)
 else:
@@ -145,8 +180,10 @@ else:
     os.chdir(args.d)
     print(f'The directory {args.d} did not exist and was created',
           file=stderr)
-    
+
 for gene_id in gene_ids:
+    if gene_id in blast_missed:
+        continue
     # Setting coordinates
     length = 0
     exons = []
@@ -156,7 +193,6 @@ for gene_id in gene_ids:
             gene = feature
         elif feature.feature_class == 'exon':
             exons.append(feature)
-    # height = 100 + len(nucleotide_blast[gene_id]) * 3
     height = 100 + 5*len(nucleotide_blast[gene_id]) + \
              max(nucleotide_blast[gene_id].values()) + \
              7 * read_counts[gene_id]
