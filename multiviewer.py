@@ -128,7 +128,8 @@ if args.f:
                     except KeyError:
                         continue
                     top_regions = sorted(sorted(blast_regions.keys(),
-                                         key=lambda x: blast_regions[x])[:2],
+                                         key=lambda x: blast_regions[x],
+                                                reverse=True)[:2],
                                          key=lambda x: x[0])
                     SeqIO.write(segment, gene_fasta, 'fasta')
                     print('\t'.join((str(x) for x in
