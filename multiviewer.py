@@ -166,7 +166,7 @@ mapped_hits = {x: [] for x in regions_of_interest}
 read_counts = {x: 0 for x in gene_ids}
 for hit in pb_reader:
     if hit.rname in features_by_source:
-        hit_coord = hit.coords
+        hit_coord = (hit.pos, hit.pos+len(hit))
         for gene in features_by_source[hit.rname]:
             if overlap((gene.start, gene.end), hit_coord):
                 mapped_hits[hit.rname].append(hit_coord)
@@ -224,10 +224,11 @@ for gene_id in gene_ids:
         if overlap(mapped_region, (gene.start, gene.end)):
             drawing.add(drawing.line(start=(mapped_region[0]-gene.start + 100,
                                             running_height),
-                                     end=(mapped_region[1]-gene.end + 100,
+                                     end=(mapped_region[1]-gene.start + 100,
                                           running_height),
                                      stroke=svgwrite.rgb(0, 0, 127),
                                      stroke_width=3
                                      ))
             running_height += 5
+            print()
     drawing.save()
