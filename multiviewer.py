@@ -32,6 +32,8 @@ parser.add_argument('-d', type=str, default='schemes', help="""
         Output directory. This directory will be created, if it doesn't exist.
         Default: 'schemes'
         """)
+parser.add_argument('-hit-ids', action='store_true',
+                    help="Print a table of mapped read IDs to stdout")
 args = parser.parse_args()
 
 # Read the ID list
@@ -151,7 +153,6 @@ if args.f:
     # Check for missing genes
     missed = gene_ids.difference(processed)
     if len(missed) > 0:
-        print(len(processed))
         print(f"No FASTA sources for the following IDs: {', '.join(missed)}\n" +
               'These genes are absent from genes FASTA, but may be used for ' +
               'read mapping if data for them is available.',
@@ -164,6 +165,7 @@ print('Loading PacBio hits...', file=stderr)
 pb_reader = Reader(open(args.p))
 mapped_hits = {x: [] for x in regions_of_interest}
 read_counts = {x: 0 for x in gene_ids}
+mapped_hit_names = {x: [] for x in gene_ids}
 for hit in pb_reader:
     if hit.rname in features_by_source:
         hit_coord = (hit.pos, hit.pos+len(hit))
@@ -171,7 +173,12 @@ for hit in pb_reader:
             if overlap((gene.start, gene.end), hit_coord):
                 mapped_hits[hit.rname].append(hit_coord)
                 read_counts[gene.get_id_prefix()] += 1
-
+                mapped_hit_names[gene.get_id_prefix()].append(hit.qname)
+if args.hit_ids:
+    for gene in mapped_hit_names:
+        if len(mapped_hit_names[gene]) > 0:
+            for read_id in mapped_hit_names[gene]:
+                print(gene+'\t'+read_id)
 
 # Producing images
 if os.path.isdir(args.d):
@@ -230,5 +237,4 @@ for gene_id in gene_ids:
                                      stroke_width=3
                                      ))
             running_height += 5
-            print()
     drawing.save()
